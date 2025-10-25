@@ -1,0 +1,82 @@
+{
+  "records": [
+    {
+      "system": "订单系统",
+      "component": "API",
+      "monitor": "CPU 使用率",
+      "required": true,
+      "monitored": true,
+      "importance": "critical"
+    },
+    {
+      "system": "订单系统",
+      "component": "API",
+      "monitor": "内存使用率",
+      "required": true,
+      "monitored": true
+    },
+    {
+      "system": "订单系统",
+      "component": "数据库",
+      "monitor": "慢查询数量",
+      "required": true,
+      "monitored": false
+    },
+    {
+      "system": "订单系统",
+      "component": "数据库",
+      "monitor": "磁盘剩余空间",
+      "required": false,
+      "monitored": true
+    },
+    {
+      "system": "支付系统",
+      "component": "网关",
+      "monitor": "请求成功率",
+      "required": true,
+      "monitored": true
+    },
+    {
+      "system": "支付系统",
+      "component": "网关",
+      "monitor": "响应时间",
+      "required": true,
+      "monitored": false
+    },
+    {
+      "system": "支付系统",
+      "component": "结算",
+      "monitor": "结算任务延迟",
+      "required": true,
+      "monitored": false
+    },
+    {
+      "system": "支付系统",
+      "component": "结算",
+      "monitor": "批处理耗时",
+      "required": false,
+      "monitored": true
+    },
+    {
+      "system": "库存系统",
+      "component": "同步服务",
+      "monitor": "消息积压量",
+      "required": true,
+      "monitored": true
+    },
+    {
+      "system": "库存系统",
+      "component": "同步服务",
+      "monitor": "同步延迟",
+      "required": true,
+      "monitored": true
+    },
+    {
+      "system": "库存系统",
+      "component": "缓存",
+      "monitor": "缓存命中率",
+      "required": false,
+      "monitored": false
+    }
+  ]
+}
