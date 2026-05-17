@@ -1,0 +1,104 @@
+{
+  "id": "INC-20260517-0032",
+  "scenario_object": "支付网关",
+  "title": "支付业务交易成功率下跌",
+  "affected_business_short": "线上支付、跨境支付、商户结算",
+  "conclusion": "支付网关系统在 14:02 的配置发布将数据库连接池 maxActive 由 200 误改为 20，导致 TDSQL 连接超时，支付业务成功率跌至 78%；建议立即回滚该配置发布，预计 2 分钟内恢复。",
+  "root_cause": "支付网关 14:02 配置发布（连接池 maxActive 200→20）",
+  "suggested_action": "一键回滚该配置发布",
+  "impact": {
+    "businesses": [
+      { "name": "线上支付", "health": "red", "metric": "业务成功率 78% ↓ 21%" },
+      { "name": "跨境支付", "health": "red", "metric": "业务成功率 81% ↓ 16%" },
+      { "name": "商户结算", "health": "yellow", "metric": "响应时间 ↑ 2.4×（受连带影响）" },
+      { "name": "账户查询", "health": "green", "metric": "正常" }
+    ],
+    "stats": [
+      { "value": "≈ 1.2 万", "label": "受影响交易（笔/分钟）", "danger": true },
+      { "value": "≈ 9.6 万", "label": "累计受损交易（笔）", "danger": true }
+    ],
+    "tech_vs_biz": [
+      { "name": "技术成功率", "health": "yellow", "metric": "88%（连接超时报错）" },
+      { "name": "业务成功率", "health": "red", "metric": "78%（交易未完成）" }
+    ],
+    "timeline": [
+      { "ts": "14:01", "text": "支付业务成功率开始下跌", "hot": false },
+      { "ts": "14:03", "text": "系统检测到业务级异常，生成 P1 故障事件并推送值班", "hot": true },
+      { "ts": "14:05", "text": "值班李工认领", "hot": false },
+      { "ts": "14:07", "text": "根因定位完成：指向 14:02 配置发布", "hot": false },
+      { "ts": "14:11", "text": "待处置 — 等待回滚确认", "hot": false }
+    ]
+  },
+  "rootcause": {
+    "chain": [
+      { "name": "收银台下单", "status": "ok", "note": "正常" },
+      { "name": "风控核验", "status": "ok", "note": "正常" },
+      { "name": "支付网关", "status": "bad", "note": "根因系统" },
+      { "name": "账务记账", "status": "warn", "note": "受连带影响" }
+    ],
+    "drill": [
+      { "depth": 0, "level": "应用系统", "object": "支付网关系统", "status": "bad", "evidence": "业务成功率 78%" },
+      { "depth": 1, "level": "微服务", "object": "pay-gateway-svc", "status": "bad", "evidence": "DB 调用超时 RT 4.8s" },
+      { "depth": 2, "level": "实例", "object": "pay-gw-prod-03 等 12 个实例（异常优先 · 同类折叠）", "status": "bad", "evidence": "连接池等待队列满" },
+      { "depth": 2, "level": "资源链路", "object": "TDSQL 连接（资源访问链路）", "status": "bad", "evidence": "获取连接超时" }
+    ],
+    "candidates": [
+      {
+        "rank": 1,
+        "title": "支付网关 14:02 配置发布 — 连接池配置错误",
+        "confidence": 92,
+        "evidence": "[变更] 14:02 张工发布 pay-gateway 配置，maxActive 200→20；[时间] 业务成功率 14:01 起跌，与发布高度吻合；[日志] 14:03 起大量连接超时报错。"
+      },
+      {
+        "rank": 2,
+        "title": "TDSQL 实例 db-pay-03 主从延迟",
+        "confidence": 6,
+        "evidence": "[指标] 主从延迟 0.8s，略高于基线但未超阈值；时间相关性弱。"
+      },
+      {
+        "rank": 3,
+        "title": "pay-gateway-svc 实例 CPU 偏高",
+        "confidence": 2,
+        "evidence": "[指标] CPU 70%，属连接堆积的结果而非原因，判定为受害征状。"
+      }
+    ],
+    "logs": [
+      { "tag": "new", "msg": "SQLException: Could not get JDBC Connection — connection timeout", "count": 1247, "meta": "12 实例 · 14:03 起" },
+      { "tag": "new", "msg": "TimeoutException: payment process timeout after 5000ms", "count": 892, "meta": "12 实例 · 14:03 起" },
+      { "tag": "base", "msg": "IllegalArgumentException: invalid coupon code", "count": 34, "meta": "全天波动 · 无关" }
+    ],
+    "log_conclusion": "14:03 起新增 1,247 次连接超时报错（故障窗内首次出现），指向数据库连接池被打满 — 与根因 #1 一致。"
+  },
+  "remediation": {
+    "actions": [
+      {
+        "title": "回滚 14:02 的配置发布",
+        "desc": "将 pay-gateway 配置回退到 14:02 前版本 · 预计 2 分钟恢复 · 执行通道：TSF",
+        "risk": "low",
+        "recommended": true,
+        "button": "一键回滚"
+      },
+      {
+        "title": "临时调大连接池 maxActive 至 200",
+        "desc": "热更新连接池参数，不重启服务 · 执行通道：作业平台",
+        "risk": "mid",
+        "recommended": false,
+        "button": "执行"
+      },
+      {
+        "title": "滚动重启支付网关 12 个实例",
+        "desc": "分批重启释放堆积连接 · 执行通道：TSF · 高风险动作需审批",
+        "risk": "mid",
+        "recommended": false,
+        "button": "执行"
+      }
+    ],
+    "oplog": [
+      { "ts": "14:03", "text": "系统自动生成 P1 故障事件，短信 + IM 推送值班李工" },
+      { "ts": "14:05", "text": "李工认领故障" },
+      { "ts": "14:07", "text": "系统完成根因定位，输出 Top-3 候选与处置建议" },
+      { "ts": "14:09", "text": "李工 @张工 确认配置发布内容" },
+      { "ts": "14:11", "text": "待执行回滚 …（超过 15 分钟未恢复将自动升级至专家与值班经理）" }
+    ]
+  }
+}
